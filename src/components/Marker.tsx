@@ -1,11 +1,11 @@
 type MarkerProps = {
   lat: number;
   lng: number;
-  showInfo?: () => void;
+  onClick?: () => void;
 };
 
-const Marker = ({ lat, lng, showInfo }: MarkerProps) => {
-  return <div onClick={showInfo}>🔥</div>;
+const Marker = ({ lat, lng, onClick }: MarkerProps) => {
+  return <div onClick={onClick}>🔥</div>;
 };
 
 export default Marker;

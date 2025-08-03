@@ -7,17 +7,21 @@ import InfoBox from "./InfoBox";
 type Event = {
   id: string;
   title: string;
-  description?: string;
   categories: Array<{ id: number; title: string }>;
   geometries: Array<{
     date: string;
-    type: string;
     coordinates: [number, number];
   }>;
 };
 
+type Info = {
+  id: string;
+  title: string;
+};
+
 const Map = () => {
   const [events, setEvents] = useState<Event[]>([]);
+  const [info, setInfo] = useState<Info | null>();
 
   useEffect(() => {
     getEvents().then((data) => setEvents(data));
@@ -30,7 +34,7 @@ const Map = () => {
         key={index}
         lat={event.geometries[0].coordinates[1]}
         lng={event.geometries[0].coordinates[0]}
-        onClick={() => <InfoBox id={event.id} title={event.title} />}
+        onClick={() => setInfo({ id: event.id, title: event.title })}
       />
     ));
 
@@ -43,6 +47,7 @@ const Map = () => {
       >
         {wildfires}
       </GoogleMapReact>
+      {info && <InfoBox id={info.id} title={info.title} />}
     </div>
   );
 };
