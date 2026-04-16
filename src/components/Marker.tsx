@@ -1,3 +1,5 @@
+import { memo } from "react";
+
 type MarkerProps = {
   lat: number;
   lng: number;
@@ -8,4 +10,4 @@ const Marker = ({ lat, lng, onClick }: MarkerProps) => {
   return <div onClick={onClick}>🔥</div>;
 };
 
-export default Marker;
+export default memo(Marker);
