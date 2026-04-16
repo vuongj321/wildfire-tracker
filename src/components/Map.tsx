@@ -21,22 +21,47 @@ type Info = {
 
 const Map = () => {
   const [events, setEvents] = useState<Event[]>([]);
-  const [info, setInfo] = useState<Info | null>();
+  const [info, setInfo] = useState<Info | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    getEvents().then((data) => setEvents(data));
-  });
+    const fetchEvents = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        const data = await getEvents();
+        if (Array.isArray(data)) {
+          setEvents(data);
+        } else {
+          setError("Could not load events data.");
+        }
+      } catch (err) {
+        setError("Failed to fetch events.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchEvents();
+  }, []);
 
   const wildfires = events
-    .filter((event) => event.categories[0].id === 8)
-    .map((event, index) => (
-      <Marker
-        key={index}
-        lat={event.geometries[0].coordinates[1]}
-        lng={event.geometries[0].coordinates[0]}
-        onClick={() => setInfo({ id: event.id, title: event.title })}
-      />
-    ));
+    .filter(
+      (event) =>
+        event.categories?.[0]?.id === 8 && event.geometries?.[0]?.coordinates,
+    )
+    .map((event) => {
+      const [lng, lat] = event.geometries[0].coordinates;
+      return (
+        <Marker
+          key={event.id}
+          lat={lat}
+          lng={lng}
+          onClick={() => setInfo({ id: event.id, title: event.title })}
+        />
+      );
+    });
 
   return (
     <div className="h-screen w-screen">
@@ -47,6 +72,16 @@ const Map = () => {
       >
         {wildfires}
       </GoogleMapReact>
+      {isLoading && (
+        <div className="absolute top-2 left-2 rounded bg-white/80 px-3 py-1 text-sm">
+          Loading wildfire data...
+        </div>
+      )}
+      {error && (
+        <div className="absolute top-2 left-2 rounded bg-red-600/80 px-3 py-1 text-sm text-white">
+          {error}
+        </div>
+      )}
       {info && <InfoBox id={info.id} title={info.title} />}
     </div>
   );
