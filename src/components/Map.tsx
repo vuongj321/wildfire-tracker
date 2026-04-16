@@ -2,7 +2,6 @@ import GoogleMapReact from "google-map-react";
 import { getEvents } from "../eventsAPI";
 import { useEffect, useMemo, useState } from "react";
 import Marker from "./Marker";
-import InfoBox from "./InfoBox";
 
 type Event = {
   id: string;
@@ -14,11 +13,6 @@ type Event = {
   }>;
 };
 
-type Info = {
-  id: string;
-  title: string;
-};
-
 type MapBounds = {
   nw: { lat: number; lng: number };
   se: { lat: number; lng: number };
@@ -26,7 +20,7 @@ type MapBounds = {
 
 const Map = () => {
   const [events, setEvents] = useState<Event[]>([]);
-  const [info, setInfo] = useState<Info | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [bounds, setBounds] = useState<MapBounds | null>(null);
@@ -74,15 +68,21 @@ const Map = () => {
           lng <= bounds.se.lng
         );
       })
-      .map(({ event, lat, lng }) => (
-        <Marker
-          key={event.id}
-          lat={lat}
-          lng={lng}
-          onClick={() => setInfo({ id: event.id, title: event.title })}
-        />
-      ));
-  }, [bounds, events]);
+      .map(({ event, lat, lng }) => {
+        const isSelected = selectedId === event.id;
+        return (
+          <Marker
+            key={event.id}
+            lat={lat}
+            lng={lng}
+            onClick={() => setSelectedId(event.id)}
+            isSelected={isSelected}
+            id={event.id}
+            title={event.title}
+          />
+        );
+      });
+  }, [bounds, events, selectedId]);
 
   return (
     <div className="h-screen w-screen">
@@ -106,7 +106,6 @@ const Map = () => {
           {error}
         </div>
       )}
-      {info && <InfoBox id={info.id} title={info.title} />}
     </div>
   );
 };
