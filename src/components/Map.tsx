@@ -1,6 +1,9 @@
 import GoogleMapReact from "google-map-react";
+import Supercluster from "supercluster";
+import type { ClusterFeature, PointFeature } from "supercluster";
 import { getEvents } from "../eventsAPI";
 import { useEffect, useMemo, useState } from "react";
+import ClusterMarker from "./ClusterMarker";
 import Marker from "./Marker";
 
 type Event = {
@@ -24,6 +27,45 @@ const Map = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [bounds, setBounds] = useState<MapBounds | null>(null);
+  const [zoom, setZoom] = useState<number>(6);
+
+  type WildfireProperties = {
+    cluster: boolean;
+    eventId: string;
+    title: string;
+    point_count?: number;
+  };
+
+  const clusterIndex = useMemo(() => {
+    const wildfireEvents = events.filter(
+      (event) =>
+        event.categories?.[0]?.id === 8 && event.geometries?.[0]?.coordinates,
+    );
+
+    const points: PointFeature<WildfireProperties>[] = wildfireEvents.map(
+      (event) => {
+        const [lng, lat] = event.geometries[0].coordinates;
+
+        return {
+          type: "Feature",
+          geometry: {
+            type: "Point",
+            coordinates: [lng, lat],
+          },
+          properties: {
+            cluster: false,
+            eventId: event.id,
+            title: event.title,
+          },
+        };
+      },
+    );
+
+    return new Supercluster<WildfireProperties>({
+      radius: 60,
+      maxZoom: 16,
+    }).load(points);
+  }, [events]);
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -46,43 +88,55 @@ const Map = () => {
     fetchEvents();
   }, []);
 
-  const wildfires = useMemo(() => {
+  const markers = useMemo(() => {
     if (!bounds) return [];
 
-    return events
-      .filter(
-        (event) =>
-          event.categories?.[0]?.id === 8 &&
-          event.geometries?.[0]?.coordinates,
-      )
-      .map((event) => {
-        const [lng, lat] = event.geometries[0].coordinates;
-        return { event, lat, lng };
-      })
-      .filter(({ lat, lng }) => {
-        // Only render markers that are inside the current viewport
+    const bbox: [number, number, number, number] = [
+      bounds.nw.lng,
+      bounds.se.lat,
+      bounds.se.lng,
+      bounds.nw.lat,
+    ];
+
+    const clusters = clusterIndex.getClusters(bbox, Math.round(zoom)) as
+      | ClusterFeature<WildfireProperties>[]
+      | PointFeature<WildfireProperties>[];
+
+    return clusters.map((clusterItem) => {
+      const [lng, lat] = clusterItem.geometry.coordinates;
+      const {
+        cluster: isCluster,
+        point_count: pointCount,
+        eventId,
+        title,
+      } = clusterItem.properties as WildfireProperties;
+
+      if (isCluster) {
         return (
-          lat <= bounds.nw.lat &&
-          lat >= bounds.se.lat &&
-          lng >= bounds.nw.lng &&
-          lng <= bounds.se.lng
-        );
-      })
-      .map(({ event, lat, lng }) => {
-        const isSelected = selectedId === event.id;
-        return (
-          <Marker
-            key={event.id}
+          <ClusterMarker
+            key={`cluster-${(clusterItem.id as number) ?? `${lng}-${lat}`}`}
             lat={lat}
             lng={lng}
-            onClick={() => setSelectedId(event.id)}
-            isSelected={isSelected}
-            id={event.id}
-            title={event.title}
+            count={pointCount ?? 0}
           />
         );
-      });
-  }, [bounds, events, selectedId]);
+      }
+
+      const isSelected = selectedId === eventId;
+
+      return (
+        <Marker
+          key={eventId}
+          lat={lat}
+          lng={lng}
+          onClick={() => setSelectedId(eventId)}
+          isSelected={isSelected}
+          id={eventId}
+          title={title}
+        />
+      );
+    });
+  }, [bounds, clusterIndex, selectedId, zoom]);
 
   return (
     <div className="h-screen w-screen">
@@ -90,11 +144,12 @@ const Map = () => {
         bootstrapURLKeys={{ key: import.meta.env.VITE_GOOGLE_API_KEY }}
         defaultCenter={{ lat: 42.3265, lng: -122.8756 }}
         defaultZoom={6}
-        onChange={({ bounds }) => {
+        onChange={({ bounds, zoom }) => {
           setBounds(bounds as MapBounds);
+          setZoom(zoom);
         }}
       >
-        {wildfires}
+        {markers}
       </GoogleMapReact>
       {isLoading && (
         <div className="absolute top-2 left-2 rounded bg-white/80 px-3 py-1 text-sm">
